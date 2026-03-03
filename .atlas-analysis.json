@@ -1,0 +1,92 @@
+{
+  "projectType": "api-service",
+  "projectName": "User Management System API",
+  "projectDescription": "Spring Boot REST API for secure user management with JWT authentication and role-based access control",
+  "theme": "linden",
+  "primaryColor": "#2563eb",
+  "lightColor": "#3b82f6",
+  "darkColor": "#1e40af",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/environment",
+              "configuration/database",
+              "configuration/security"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/authentication",
+              "concepts/authorization",
+              "concepts/roles"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth/signup",
+              "api/auth/login"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "api/users/me"
+            ]
+          },
+          {
+            "group": "Admin",
+            "pages": [
+              "api/admin/list-users"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Development",
+            "pages": [
+              "guides/testing",
+              "guides/error-handling",
+              "guides/validation"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "JWT-based authentication and authorization",
+    "Role-based access control (USER/ADMIN)",
+    "Field validation with Jakarta Validation",
+    "H2 and MySQL database support",
+    "Comprehensive unit and integration tests",
+    "Global exception handling"
+  ],
+  "publicApiSurface": [
+    "POST /auth/signup - Register new user",
+    "POST /auth/login - Authenticate and get JWT token",
+    "GET /users/me - Get current user info (USER role)",
+    "GET /admin/users - List all users (ADMIN role)"
+  ]
+}
