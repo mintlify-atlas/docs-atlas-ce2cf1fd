@@ -1,0 +1,416 @@
+---
+title: Roles
+description: Learn about user roles, permissions, and access control in the User Management System
+---
+
+## Overview
+
+The User Management System uses a simple but effective role-based access control model with two distinct roles. Each role has specific permissions that determine what actions users can perform and which endpoints they can access.
+
+## Available Roles
+
+Roles are defined as an enum in `Role.java:3-6`:
+
+```java
+public enum Role {
+    ROLE_USER,
+    ROLE_ADMIN
+}
+```
+
+<Note>
+Using an enum ensures type safety and prevents invalid role assignments. The role is stored as a string in the database using JPA's `@Enumerated(EnumType.STRING)` annotation.
+</Note>
+
+### ROLE_USER
+
+**Description**: Standard user role with basic access permissions.
+
+**Assigned to**: All newly registered users by default.
+
+**Capabilities**:
+- View their own user information
+- Update their own profile (future functionality)
+- Access user-level endpoints
+
+**Restrictions**:
+- Cannot view other users
+- Cannot access administrative functions
+- Cannot modify system settings
+
+### ROLE_ADMIN
+
+**Description**: Administrator role with elevated privileges.
+
+**Assigned to**: System administrators (manual assignment required).
+
+**Capabilities**:
+- View all users in the system
+- Access administrative endpoints
+- Perform system-wide operations
+- All permissions that ROLE_USER has (in most implementations)
+
+**Restrictions**:
+- Must be explicitly assigned (not available through signup)
+
+## Default Role Assignment
+
+When a new user registers, they are automatically assigned the `ROLE_USER` role. This is implemented using Lombok's `@Builder.Default` annotation in `User.java:32-33`:
+
+```java
+@Enumerated(EnumType.STRING)
+@Column(nullable = false)
+@Builder.Default
+private Role role = Role.ROLE_USER;
+```
+
+### Registration Flow
+
+```mermaid
+flowchart LR
+    A[User Registration] --> B[POST /auth/signup]
+    B --> C[UserService.registerUser]
+    C --> D[Create User Entity]
+    D --> E[Default: role = ROLE_USER]
+    E --> F[Save to Database]
+    F --> G[Return SignupResponseDTO]
+```
+
+<Info>
+The default role assignment happens automatically during user creation. There is no need to specify a role when signing up—all new users start as `ROLE_USER`.
+</Info>
+
+## Role Storage
+
+Roles are stored in the database as part of the User entity:
+
+```java
+// User.java:30-33
+@Enumerated(EnumType.STRING)
+@Column(nullable = false)
+@Builder.Default
+private Role role = Role.ROLE_USER;
+```
+
+**Storage Details**:
+- **Database Column**: `role` (VARCHAR type)
+- **Format**: String representation (e.g., "ROLE_USER", "ROLE_ADMIN")
+- **Required**: Yes (`nullable = false`)
+- **Enum Type**: `STRING` (stores the enum name rather than ordinal)
+
+<Warning>
+Using `EnumType.STRING` is important for database portability. If you use `EnumType.ORDINAL`, adding new roles or reordering the enum could break existing data.
+</Warning>
+
+## Role Inclusion in JWT
+
+When a user logs in, their role is embedded in the JWT token. This happens in `UserServiceImpl.java:59`:
+
+```java
+String token = jwtUtil.generateToken(existingUser.getUsername(), existingUser.getRole().name());
+```
+
+The role is stored as a custom claim in the JWT (`JwtUtil.java:23`):
+
+```java
+public String generateToken(String username, String role) {
+    return JWT.create()
+            .withSubject(username)
+            .withClaim("role", role)  // Role stored here
+            .withExpiresAt(new Date(System.currentTimeMillis() + EXPIRATION_DATE))
+            .sign(Algorithm.HMAC256(SECRET));
+}
+```
+
+### Role Extraction from JWT
+
+When validating requests, the role is extracted from the token (`JwtUtil.java:43-46`):
+
+```java
+public String getRoleFromToken(String token) {
+    DecodedJWT decodedJWT = validateToken(token);
+    return decodedJWT != null ? decodedJWT.getClaim("role").asString() : null;
+}
+```
+
+## Permissions for Each Role
+
+Here's a comprehensive breakdown of what each role can do:
+
+<AccordionGroup>
+  <Accordion title="ROLE_USER Permissions">
+    **Allowed Operations**:
+    - Register a new account (`POST /auth/signup`)
+    - Login to the system (`POST /auth/login`)
+    - View own user information (`GET /users/me`)
+    
+    **Denied Operations**:
+    - View all users (`GET /admin/users`) - Returns 403 Forbidden
+    - Any administrative functions
+  </Accordion>
+
+  <Accordion title="ROLE_ADMIN Permissions">
+    **Allowed Operations**:
+    - All public endpoints (signup, login)
+    - View all users in the system (`GET /admin/users`)
+    - Administrative operations
+    
+    **Note**: Based on the current configuration, admins might not be able to access `/users/me` if it strictly requires `ROLE_USER` and the admin doesn't have that role.
+  </Accordion>
+</AccordionGroup>
+
+## Endpoint Access Matrix
+
+This table shows which roles can access each endpoint:
+
+| Endpoint | Method | ROLE_USER | ROLE_ADMIN | Authentication Required |
+|----------|--------|-----------|------------|-------------------------|
+| `/auth/signup` | POST | ✅ | ✅ | No |
+| `/auth/login` | POST | ✅ | ✅ | No |
+| `/users/me` | GET | ✅ | ❌* | Yes |
+| `/admin/users` | GET | ❌ | ✅ | Yes |
+
+<Note>
+*Based on the current security configuration (`SecurityConfig.java:29`), `/users/me` requires `ROLE_USER` authority specifically. This means admins with only `ROLE_ADMIN` cannot access it. In a typical implementation, you might want to use `hasAnyAuthority("ROLE_USER", "ROLE_ADMIN")` to allow both roles.
+</Note>
+
+### Security Configuration Reference
+
+The endpoint protection is defined in `SecurityConfig.java:27-31`:
+
+```java
+.authorizeHttpRequests(authz -> authz
+        .requestMatchers("/auth/**").permitAll()
+        .requestMatchers("/users/me").hasAnyAuthority("ROLE_USER")
+        .requestMatchers("/admin/users").hasAnyAuthority("ROLE_ADMIN")
+)
+```
+
+## How to Assign Roles
+
+### Default Assignment (Automatic)
+
+All users who register through `/auth/signup` automatically receive `ROLE_USER`:
+
+```java
+// UserServiceImpl.java:35-39
+User user = User.builder()
+        .username(createUserDTO.getUsername())
+        .email(createUserDTO.getEmail())
+        .password(passwordEncoder.encode(createUserDTO.getPassword()))
+        .build();  // role defaults to ROLE_USER
+```
+
+### Admin Assignment (Manual)
+
+Currently, there's no public endpoint to create admin users. Admin roles must be assigned through:
+
+1. **Direct Database Modification**: Update the user's role column directly
+2. **Database Seeding**: Create admin users through initialization scripts
+3. **Administrative Endpoint**: Implement a protected endpoint for role management (not currently available)
+
+<Warning>
+There is no signup endpoint for creating admin users. This is a security feature to prevent unauthorized privilege escalation. Admin users should be created through controlled, secure processes.
+</Warning>
+
+## Role-Based Response Filtering
+
+While the current implementation doesn't show this, you can filter response data based on roles. For example:
+
+```java
+// Example: Only admins see sensitive data
+public UserResponseDTO getUser(String userId, String currentUserRole) {
+    User user = userRepository.findById(userId);
+    
+    if ("ROLE_ADMIN".equals(currentUserRole)) {
+        // Return full user details including password hash, etc.
+        return mapToFullDTO(user);
+    } else {
+        // Return limited user details
+        return mapToLimitedDTO(user);
+    }
+}
+```
+
+## Testing Role-Based Access
+
+### Create a Regular User
+
+```bash
+curl -X POST http://localhost:8080/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "johndoe",
+    "email": "john@example.com",
+    "password": "securepass123"
+  }'
+```
+
+**Result**: User created with `ROLE_USER`
+
+### Login as User
+
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com",
+    "password": "securepass123"
+  }'
+```
+
+**Response includes**:
+```json
+{
+  "id": 1,
+  "username": "johndoe",
+  "email": "john@example.com",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+The JWT token contains the role claim:
+```json
+{
+  "sub": "johndoe",
+  "role": "ROLE_USER",
+  "exp": 1234567890
+}
+```
+
+### Test User Access
+
+```bash
+# Access allowed
+curl -X GET http://localhost:8080/users/me \
+  -H "Authorization: Bearer <user_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "john@example.com", "password": "securepass123"}'
+
+# Access denied (403 Forbidden)
+curl -X GET http://localhost:8080/admin/users \
+  -H "Authorization: Bearer <user_token>"
+```
+
+### Test Admin Access
+
+```bash
+# First, create an admin user in the database manually
+# Then login as admin
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@example.com",
+    "password": "adminpass"
+  }'
+
+# Access admin endpoint (allowed)
+curl -X GET http://localhost:8080/admin/users \
+  -H "Authorization: Bearer <admin_token>"
+```
+
+## Common Scenarios
+
+<AccordionGroup>
+  <Accordion title="Promoting a User to Admin">
+    Since there's no built-in endpoint, you need to update the database directly:
+
+    ```sql
+    UPDATE users SET role = 'ROLE_ADMIN' WHERE email = 'user@example.com';
+    ```
+
+    The user must login again to receive a new JWT token with the updated role.
+  </Accordion>
+
+  <Accordion title="Checking Current User's Role">
+    The role is included in the JWT token and can be decoded client-side (though not verified without the secret). 
+    
+    Alternatively, return the role in the login response or create a `/users/me/role` endpoint.
+  </Accordion>
+
+  <Accordion title="Handling Role Changes">
+    If a user's role changes in the database:
+    1. The change doesn't affect existing JWT tokens (they still have the old role)
+    2. The user must login again to get a new token with the updated role
+    3. Consider implementing token invalidation if immediate role changes are needed
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+### 1. Never Trust Client-Provided Roles
+
+Always fetch the role from the database during login, never accept it from the client:
+
+```java
+// GOOD: Fetch role from database
+String token = jwtUtil.generateToken(
+    existingUser.getUsername(), 
+    existingUser.getRole().name()  // From database
+);
+
+// BAD: Don't do this!
+String token = jwtUtil.generateToken(
+    username, 
+    requestDTO.getRole()  // From client request - NEVER!
+);
+```
+
+### 2. Use Enums for Type Safety
+
+The enum-based role system prevents typos and invalid values:
+
+```java
+// Type-safe
+private Role role = Role.ROLE_USER;
+
+// Error at compile time if you mistype
+private Role role = Role.ROLE_SUPER_ADMIN;  // Compilation error!
+```
+
+### 3. Centralize Authorization Logic
+
+Keep authorization rules in `SecurityConfig` rather than scattering them across controllers:
+
+```java
+// GOOD: Centralized in SecurityConfig
+.requestMatchers("/admin/**").hasAnyAuthority("ROLE_ADMIN")
+
+// LESS IDEAL: Authorization in controller
+@PreAuthorize("hasRole('ADMIN')")
+public List<User> getAllUsers() { ... }
+```
+
+### 4. Consider a Role Hierarchy
+
+For more complex systems, consider implementing a role hierarchy where admins automatically inherit user permissions:
+
+```java
+@Bean
+public RoleHierarchy roleHierarchy() {
+    RoleHierarchyImpl hierarchy = new RoleHierarchyImpl();
+    hierarchy.setHierarchy("ROLE_ADMIN > ROLE_USER");
+    return hierarchy;
+}
+```
+
+## Future Enhancements
+
+Consider implementing:
+
+1. **Additional Roles**: Add roles like `ROLE_MODERATOR`, `ROLE_PREMIUM_USER`, etc.
+2. **Fine-Grained Permissions**: Move beyond roles to individual permissions
+3. **Role Management Endpoints**: Allow admins to change user roles via API
+4. **Role Auditing**: Track when and by whom roles were changed
+5. **Multi-Role Support**: Allow users to have multiple roles simultaneously
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/concepts/authentication">
+    Learn how JWT authentication works
+  </Card>
+  <Card title="Authorization" icon="shield" href="/concepts/authorization">
+    Understand how roles enforce access control
+  </Card>
+</CardGroup>

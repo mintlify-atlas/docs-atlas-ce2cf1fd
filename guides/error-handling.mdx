@@ -1,0 +1,353 @@
+---
+title: Error Handling
+description: Learn how errors are handled and formatted in the User Management System
+---
+
+## Overview
+
+The User Management System uses a centralized error handling approach with Spring's `@RestControllerAdvice` to catch and format exceptions consistently across all endpoints.
+
+## GlobalExceptionHandler
+
+All validation and application exceptions are handled by the `GlobalExceptionHandler` class.
+
+**Location**: `src/main/java/dev/juanJe/userManagementSystem/config/GlobalExceptionHandler.java`
+
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponseDTO> handlerValidationExceptions(
+        MethodArgumentNotValidException exception
+    ) {
+        List<String> errors = new ArrayList<>();
+        
+        for (FieldError error : exception.getBindingResult().getFieldErrors()) {
+            errors.add(error.getDefaultMessage());
+        }
+        
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+            "Error de validacion",
+            HttpStatus.BAD_REQUEST.value(),
+            errors
+        );
+        
+        return ResponseEntity.badRequest().body(errorResponse);
+    }
+}
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Exception occurs">
+    When a validation error or exception is thrown in any controller, Spring catches it.
+  </Step>
+  
+  <Step title="Handler matches exception type">
+    The `@ExceptionHandler` annotation maps specific exception types to handler methods.
+  </Step>
+  
+  <Step title="Error details extracted">
+    Field errors are collected from the exception's `BindingResult`.
+  </Step>
+  
+  <Step title="Response formatted">
+    An `ErrorResponseDTO` is created with the error details and returned to the client.
+  </Step>
+</Steps>
+
+## Error Response Format
+
+All errors follow a standard JSON structure defined by `ErrorResponseDTO`.
+
+**Location**: `src/main/java/dev/juanJe/userManagementSystem/dto/ErrorResponseDTO.java`
+
+### Structure
+
+```java
+public class ErrorResponseDTO {
+    private String message;      // High-level error description
+    private int status;          // HTTP status code
+    private LocalDateTime timestamp; // When the error occurred
+    private List<String> errors;    // Detailed error messages
+}
+```
+
+### Example Response
+
+<CodeGroup>
+```json Validation Error
+{
+  "message": "Error de validacion",
+  "status": 400,
+  "timestamp": "2026-03-03T10:30:45.123",
+  "errors": [
+    "Username obligatorio",
+    "El email debe ser valido",
+    "La password debe tener entre 8 y 16 caracteres"
+  ]
+}
+```
+
+```json Single Field Error
+{
+  "message": "Error de validacion",
+  "status": 400,
+  "timestamp": "2026-03-03T10:32:15.789",
+  "errors": [
+    "La password debe tener al menos una numero, una letra minuscula y una letra mayuscula"
+  ]
+}
+```
+</CodeGroup>
+
+<Note>
+  The `timestamp` field is automatically populated when the `ErrorResponseDTO` is created using the constructor with three parameters.
+</Note>
+
+## Common Error Scenarios
+
+### Validation Errors (400 Bad Request)
+
+Triggered when request body fails Jakarta Validation constraints.
+
+<Accordion title="Missing Required Fields">
+  **Scenario**: Client sends incomplete user registration data
+  
+  **Request**:
+  ```json
+  {
+    "username": "",
+    "email": "test@example.com"
+  }
+  ```
+  
+  **Response**:
+  ```json
+  {
+    "message": "Error de validacion",
+    "status": 400,
+    "timestamp": "2026-03-03T10:30:45.123",
+    "errors": [
+      "Username obligatorio",
+      "Password obligatorio"
+    ]
+  }
+  ```
+  
+  **HTTP Status**: `400 BAD REQUEST`
+</Accordion>
+
+<Accordion title="Invalid Email Format">
+  **Scenario**: Client provides malformed email address
+  
+  **Request**:
+  ```json
+  {
+    "username": "john_doe",
+    "email": "invalid-email",
+    "password": "SecurePass1"
+  }
+  ```
+  
+  **Response**:
+  ```json
+  {
+    "message": "Error de validacion",
+    "status": 400,
+    "timestamp": "2026-03-03T10:31:22.456",
+    "errors": [
+      "El email debe ser valido"
+    ]
+  }
+  ```
+  
+  **HTTP Status**: `400 BAD REQUEST`
+</Accordion>
+
+<Accordion title="Username Too Short">
+  **Scenario**: Username doesn't meet minimum length requirement
+  
+  **Request**:
+  ```json
+  {
+    "username": "ab",
+    "email": "test@example.com",
+    "password": "SecurePass1"
+  }
+  ```
+  
+  **Response**:
+  ```json
+  {
+    "message": "Error de validacion",
+    "status": 400,
+    "timestamp": "2026-03-03T10:32:10.789",
+    "errors": [
+      "El username debe tener entre 3 y 20 caracteres"
+    ]
+  }
+  ```
+  
+  **HTTP Status**: `400 BAD REQUEST`
+</Accordion>
+
+<Accordion title="Weak Password">
+  **Scenario**: Password doesn't meet complexity requirements
+  
+  **Request**:
+  ```json
+  {
+    "username": "john_doe",
+    "email": "test@example.com",
+    "password": "password"
+  }
+  ```
+  
+  **Response**:
+  ```json
+  {
+    "message": "Error de validacion",
+    "status": 400,
+    "timestamp": "2026-03-03T10:33:05.234",
+    "errors": [
+      "La password debe tener al menos una numero, una letra minuscula y una letra mayuscula"
+    ]
+  }
+  ```
+  
+  **HTTP Status**: `400 BAD REQUEST`
+</Accordion>
+
+### Multiple Validation Errors
+
+When multiple fields fail validation, all errors are returned together:
+
+```json
+{
+  "message": "Error de validacion",
+  "status": 400,
+  "timestamp": "2026-03-03T10:35:20.567",
+  "errors": [
+    "Username obligatorio",
+    "El email debe ser valido",
+    "La password debe tener entre 8 y 16 caracteres",
+    "La password debe tener al menos una numero, una letra minuscula y una letra mayuscula"
+  ]
+}
+```
+
+## HTTP Status Codes
+
+The API uses standard HTTP status codes:
+
+| Status Code | Meaning | When Used |
+|-------------|---------|----------|
+| `400` | Bad Request | Validation errors, malformed requests |
+| `401` | Unauthorized | Missing or invalid authentication token |
+| `403` | Forbidden | Valid token but insufficient permissions |
+| `404` | Not Found | Resource doesn't exist |
+| `409` | Conflict | Duplicate username or email |
+| `500` | Internal Server Error | Unexpected server errors |
+
+<Note>
+  Currently, the `GlobalExceptionHandler` explicitly handles validation errors (400). Other status codes may be returned by Spring Security filters or custom exception handlers.
+</Note>
+
+## Handling Errors in Client Applications
+
+### JavaScript/TypeScript Example
+
+```typescript
+try {
+  const response = await fetch('/api/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: 'jo',
+      email: 'invalid-email',
+      password: 'weak'
+    })
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    
+    // Display all validation errors
+    errorData.errors.forEach(error => {
+      console.error(error);
+    });
+    
+    // Or show a summary
+    alert(`${errorData.message}: ${errorData.errors.join(', ')}`);
+  }
+} catch (error) {
+  console.error('Network error:', error);
+}
+```
+
+### Java Client Example
+
+```java
+try {
+    // Attempt API call
+    SignupResponseDTO response = apiClient.signup(createUserDTO);
+} catch (HttpClientErrorException.BadRequest e) {
+    // Parse error response
+    ObjectMapper mapper = new ObjectMapper();
+    ErrorResponseDTO error = mapper.readValue(
+        e.getResponseBodyAsString(), 
+        ErrorResponseDTO.class
+    );
+    
+    // Handle validation errors
+    error.getErrors().forEach(System.err::println);
+}
+```
+
+## Extending Error Handling
+
+To handle additional exception types, add new `@ExceptionHandler` methods:
+
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    
+    // Existing validation handler...
+    
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponseDTO> handleResponseStatusException(
+        ResponseStatusException exception
+    ) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+            exception.getReason(),
+            exception.getStatusCode().value(),
+            List.of(exception.getMessage())
+        );
+        
+        return ResponseEntity
+            .status(exception.getStatusCode())
+            .body(errorResponse);
+    }
+    
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponseDTO> handleGenericException(
+        Exception exception
+    ) {
+        ErrorResponseDTO errorResponse = new ErrorResponseDTO(
+            "Internal server error",
+            HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            List.of(exception.getMessage())
+        );
+        
+        return ResponseEntity
+            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(errorResponse);
+    }
+}
+```
+
+<Note>
+  When adding custom exception handlers, place more specific handlers before generic ones to ensure proper exception matching.
+</Note>

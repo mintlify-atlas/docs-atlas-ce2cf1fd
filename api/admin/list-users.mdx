@@ -1,0 +1,138 @@
+---
+title: "List All Users"
+api: "GET /admin/users"
+---
+
+## Overview
+
+Retrieves a list of all users in the system. This is an admin-only endpoint.
+
+## Authentication
+
+This endpoint requires:
+- A valid JWT token in the Authorization header
+- The user must have `ROLE_ADMIN` authority
+
+## Request
+
+### Headers
+
+```
+Authorization: Bearer <jwt_token>
+```
+
+### Parameters
+
+This endpoint does not accept any parameters.
+
+## Response
+
+Returns an array of User objects.
+
+<ResponseField name="id" type="long">
+  The unique identifier of the user
+</ResponseField>
+
+<ResponseField name="username" type="string">
+  The username of the user
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  The email address of the user
+</ResponseField>
+
+<ResponseField name="password" type="string">
+  The encrypted password of the user (BCrypt hash)
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  The role assigned to the user. Possible values:
+  - `ROLE_USER`: Regular user with standard permissions
+  - `ROLE_ADMIN`: Administrator with elevated permissions
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X GET https://api.example.com/admin/users \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+## Example Response
+
+```json
+[
+  {
+    "id": 1,
+    "username": "admin-user",
+    "email": "adminsystem@ums.com",
+    "password": "$2a$10$CuLvGxp8sG8l3z.29J8OMuq0mLp8M91UiMXe/6uahhetUQle5YYmy",
+    "role": "ROLE_ADMIN"
+  },
+  {
+    "id": 2,
+    "username": "normal-user",
+    "email": "usernormalsystem@ums.com",
+    "password": "$2a$10$zAjODzgBZhCuL80b1OT51.jpYuOB8WmwqZ/u9ls4Xf7r0.7Vh9.jy",
+    "role": "ROLE_USER"
+  }
+]
+```
+
+## Error Responses
+
+### 401 Unauthorized
+
+Returned when:
+- No JWT token is provided
+- The JWT token is invalid or expired
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Authentication required"
+}
+```
+
+### 403 Forbidden
+
+Returned when the user does not have the required `ROLE_ADMIN` authority.
+
+```json
+{
+  "error": "Forbidden",
+  "message": "Access denied. Admin privileges required."
+}
+```
+
+## How to Authenticate as Admin
+
+To access this endpoint, you need to authenticate with admin credentials and obtain a JWT token:
+
+```bash
+curl -X POST https://api.example.com/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "adminsystem@ums.com",
+    "password": "admin123"
+  }'
+```
+
+The login response will include a `token` field:
+
+```json
+{
+  "id": 1,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "username": "admin-user",
+  "email": "adminsystem@ums.com"
+}
+```
+
+Use this token in the Authorization header as `Bearer <token>` when calling the `/admin/users` endpoint.
+
+## Notes
+
+- The passwords returned in the response are BCrypt hashed for security
+- Only users with `ROLE_ADMIN` can access this endpoint
+- The endpoint returns all users regardless of their role

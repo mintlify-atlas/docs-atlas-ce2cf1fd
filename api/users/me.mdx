@@ -1,0 +1,137 @@
+---
+title: "Get Current User Info"
+api: "GET /users/me"
+---
+
+## Overview
+
+Retrieves the current authenticated user's information by validating their email and password credentials.
+
+## Authentication
+
+This endpoint requires:
+- A valid JWT token in the Authorization header
+- The user must have `ROLE_USER` authority
+- Valid email and password in the request body
+
+## Request
+
+### Headers
+
+```
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+```
+
+### Body Parameters
+
+<ParamField body="email" type="string" required>
+  The email address of the user
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The user's password
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="long">
+  The unique identifier of the user
+</ResponseField>
+
+<ResponseField name="username" type="string">
+  The username of the user
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  The email address of the user
+</ResponseField>
+
+<ResponseField name="password" type="string">
+  The encrypted password of the user
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  The role assigned to the user (e.g., ROLE_USER, ROLE_ADMIN)
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X GET https://api.example.com/users/me \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "usernormalsystem@ums.com",
+    "password": "password123"
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "id": 2,
+  "username": "normal-user",
+  "email": "usernormalsystem@ums.com",
+  "password": "$2a$10$zAjODzgBZhCuL80b1OT51.jpYuOB8WmwqZ/u9ls4Xf7r0.7Vh9.jy",
+  "role": "ROLE_USER"
+}
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+Returned when the request body validation fails.
+
+```json
+{
+  "message": "Error de validacion",
+  "statusCode": 400,
+  "errors": [
+    "Email is required",
+    "Password is required"
+  ]
+}
+```
+
+### 401 Unauthorized
+
+Returned when:
+- No JWT token is provided
+- The JWT token is invalid or expired
+- The credentials (email/password) are incorrect
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Authentication failed"
+}
+```
+
+### 403 Forbidden
+
+Returned when the user does not have the required `ROLE_USER` authority.
+
+```json
+{
+  "error": "Forbidden",
+  "message": "Access denied"
+}
+```
+
+## How to Get a JWT Token
+
+Before calling this endpoint, you need to authenticate and obtain a JWT token:
+
+```bash
+curl -X POST https://api.example.com/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "usernormalsystem@ums.com",
+    "password": "password123"
+  }'
+```
+
+The login response will include a `token` field that you can use in the Authorization header.

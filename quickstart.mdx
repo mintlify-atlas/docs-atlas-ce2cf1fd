@@ -1,80 +1,343 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get the User Management System API running locally in minutes and make your first authenticated request
 ---
 
-## Get started in three steps
+# Quickstart Guide
 
-Get your documentation site running locally and make your first customization.
+This guide will help you set up the User Management System API locally and make your first authenticated requests. You'll be up and running in less than 10 minutes.
 
-### Step 1: Set up your local environment
+## Prerequisites
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+Before you begin, ensure you have:
 
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+- **Java 17** or higher installed
+- **Maven 3.6+** for dependency management
+- **Git** to clone the repository
+- A REST client like **cURL**, **Postman**, or **HTTPie**
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  For production deployment, you'll also need **MySQL 8.0+**. For development, the system uses an in-memory H2 database with no setup required.
 </Note>
+
+## Installation
+
+<Steps>
+  <Step title="Clone the repository">
+    Clone the User Management System repository to your local machine:
+
+    ```bash
+    git clone https://github.com/JuanSotoSegovia/apiREST-userManagementSystem.git
+    cd apiREST-userManagementSystem
+    ```
+  </Step>
+
+  <Step title="Configure the environment profile">
+    The system supports two profiles: `dev` (H2 database) and `prod` (MySQL). For quickstart, use the development profile.
+
+    Open `src/main/resources/application.properties` and verify the active profile:
+
+    ```properties
+    spring.application.name=userManagementSystem
+    spring.profiles.active=dev
+    ```
+
+    <Info>
+      The `dev` profile uses an in-memory H2 database that's automatically created on startup with pre-loaded test users.
+    </Info>
+
+    ### Development Profile (H2)
+
+    No configuration needed! The development profile (`application-dev.properties`) comes pre-configured:
+
+    ```properties
+    spring.datasource.url=jdbc:h2:mem:usermanagementdb
+    spring.datasource.username=sa
+    spring.datasource.password=
+    
+    jwt.secret=dev_secret
+    jwt.expiration=86400000
+    ```
+
+    ### Production Profile (MySQL)
+
+    For production deployment, set `spring.profiles.active=prod` and configure MySQL in `application-prod.properties`:
+
+    ```properties
+    spring.datasource.url=jdbc:mysql://localhost:3306/user_management
+    spring.datasource.username=root
+    spring.datasource.password=admin
+    
+    jwt.secret=prod_secret
+    jwt.expiration=86400000
+    ```
+
+    <Warning>
+      Always change the `jwt.secret` value in production to a strong, randomly generated secret.
+    </Warning>
+  </Step>
+
+  <Step title="Start the application">
+    Run the application using Maven:
+
+    ```bash
+    mvn spring-boot:run
+    ```
+
+    You should see output indicating the application has started:
+
+    ```
+    Started UserManagementSystemApplication in 3.456 seconds
+    ```
+
+    The API is now running at `http://localhost:8080`
+  </Step>
+
+  <Step title="Verify the setup">
+    Test that the API is accessible by checking the health of the auth endpoint:
+
+    ```bash
+    curl http://localhost:8080/auth/signup
+    ```
+
+    You should receive a 400 Bad Request response (expected, since we didn't send a body), confirming the endpoint is active.
+  </Step>
+</Steps>
+
+## Make Your First API Call
+
+Now that the API is running, let's create a user account and authenticate.
+
+### 1. Register a New User
+
+Create a new user account by sending a POST request to `/auth/signup`:
+
+<CodeGroup>
+```bash cURL
+curl -X POST http://localhost:8080/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "johndoe",
+    "email": "john.doe@example.com",
+    "password": "SecurePass123"
+  }'
+```
+
+```javascript JavaScript
+fetch('http://localhost:8080/auth/signup', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    username: 'johndoe',
+    email: 'john.doe@example.com',
+    password: 'SecurePass123'
+  })
+})
+.then(res => res.json())
+.then(data => console.log(data));
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    'http://localhost:8080/auth/signup',
+    json={
+        'username': 'johndoe',
+        'email': 'john.doe@example.com',
+        'password': 'SecurePass123'
+    }
+)
+print(response.json())
+```
+</CodeGroup>
+
+**Request Body Requirements** (from `CreateUserDTO.java:10`):
+
+- `username`: 3-20 characters, required
+- `email`: Valid email format, required  
+- `password`: 8-16 characters, must contain at least one number, one lowercase letter, and one uppercase letter
+
+**Response** (201 Created):
+
+```json
+{
+  "id": 3,
+  "username": "johndoe",
+  "email": "john.doe@example.com"
+}
+```
+
+<Note>
+  The password is automatically hashed using BCrypt before storage (configured in `SecurityConfig.java:38`).
+</Note>
+
+### 2. Login and Get JWT Token
+
+Authenticate with your credentials to receive a JWT token:
+
+<CodeGroup>
+```bash cURL
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john.doe@example.com",
+    "password": "SecurePass123"
+  }'
+```
+
+```javascript JavaScript
+fetch('http://localhost:8080/auth/login', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    email: 'john.doe@example.com',
+    password: 'SecurePass123'
+  })
+})
+.then(res => res.json())
+.then(data => console.log(data));
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    'http://localhost:8080/auth/login',
+    json={
+        'email': 'john.doe@example.com',
+        'password': 'SecurePass123'
+    }
+)
+print(response.json())
+```
+</CodeGroup>
+
+**Response** (200 OK):
+
+```json
+{
+  "id": 3,
+  "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqb2huLmRvZUBleGFtcGxlLmNvbSIsInJvbGVzIjpbIlJPTEVfVVNFUiJdLCJpYXQiOjE3MDk0OTYwMDAsImV4cCI6MTcwOTU4MjQwMH0.Xm9kZUlkZW50aWZpZXI",
+  "username": "johndoe",
+  "email": "john.doe@example.com"
+}
+```
+
+<Info>
+  Save the `token` value - you'll need it to authenticate subsequent requests to protected endpoints.
+</Info>
+
+### 3. Access Protected Endpoints
+
+Use the JWT token to access protected resources. Include it in the `Authorization` header:
+
+```bash cURL
+curl -X GET http://localhost:8080/users/me \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john.doe@example.com",
+    "password": "SecurePass123"
+  }'
+```
+
+**Response** (200 OK):
+
+```json
+{
+  "id": 3,
+  "username": "johndoe",
+  "email": "john.doe@example.com",
+  "role": "ROLE_USER"
+}
+```
+
+## Pre-loaded Test Users
+
+In development mode, the system comes with two pre-loaded users (defined in `data.sql`):
+
+| Username | Email | Password | Role |
+|----------|-------|----------|------|
+| `admin-user` | adminsystem@ums.com | `Admin1234` | `ROLE_ADMIN` |
+| `normal-user` | usernormalsystem@ums.com | `NorUs1234` | `ROLE_USER` |
+
+You can use these accounts to test admin-level endpoints:
+
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "adminsystem@ums.com",
+    "password": "Admin1234"
+  }'
+```
+
+Then access the admin endpoint to list all users:
+
+```bash
+curl -X GET http://localhost:8080/admin/users \
+  -H "Authorization: Bearer ADMIN_JWT_TOKEN"
+```
+
+<Warning>
+  The `/admin/users` endpoint requires `ROLE_ADMIN` (configured in `SecurityConfig.java:30`). Regular users will receive a 403 Forbidden response.
+</Warning>
+
+## Common Validation Errors
+
+The API validates all inputs. Here are common errors you might encounter:
+
+**Invalid Email Format:**
+```json
+{
+  "email": "El email debe ser valido"
+}
+```
+
+**Weak Password:**
+```json
+{
+  "password": "La password debe tener al menos una numero, una letra minuscula y una letra mayuscula"
+}
+```
+
+**Username Too Short:**
+```json
+{
+  "username": "El username debe tener entre 3 y 20 caracteres"
+}
+```
+
+## Next Steps
+
+Now that you have the API running, explore these resources:
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api/auth/signup">
+    Explore all endpoints, request schemas, and response formats
+  </Card>
+  <Card title="Authentication Guide" icon="shield" href="/concepts/authentication">
+    Deep dive into JWT authentication and authorization
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/configuration/environment">
+    Learn about environment variables, database setup, and security config
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Understand error responses and how to handle them
+  </Card>
+</CardGroup>
+
+## Need Help?
+
+If you encounter issues:
+
+- Check that Java 17+ is installed: `java -version`
+- Verify Maven is available: `mvn -version`
+- Ensure port 8080 is not in use
+- Review application logs for detailed error messages
+- For production MySQL setup, verify database connectivity and credentials

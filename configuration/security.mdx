@@ -1,0 +1,376 @@
+---
+title: Security Configuration
+description: Configure JWT authentication and security settings
+---
+
+## Overview
+
+The User Management System uses JWT (JSON Web Tokens) for stateless authentication. Security is configured through Spring Security with a custom JWT filter chain.
+
+## JWT Configuration
+
+JWT settings are configured in the profile-specific properties files.
+
+### Development Settings
+
+```properties application-dev.properties
+jwt.secret=dev_secret
+jwt.expiration=86400000
+```
+
+### Production Settings
+
+```properties application-prod.properties
+jwt.secret=prod_secret
+jwt.expiration=86400000
+```
+
+<Warning>
+The default secrets shown above are examples only. Always use strong, randomly generated secrets in production!
+</Warning>
+
+## Secret Key Setup
+
+### Generating a Secure Secret
+
+Your JWT secret should be at least 256 bits (32 characters) long. Generate a secure secret:
+
+<CodeGroup>
+```bash OpenSSL
+openssl rand -base64 32
+```
+
+```bash Node.js
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+```python Python
+import secrets
+print(secrets.token_urlsafe(32))
+```
+</CodeGroup>
+
+### Setting the Secret
+
+<Tabs>
+  <Tab title="Environment Variable">
+    ```bash
+    export JWT_SECRET=your-generated-secret-key-here
+    export JWT_EXPIRATION=86400000
+    ```
+  </Tab>
+  
+  <Tab title="Properties File">
+    ```properties
+    jwt.secret=${JWT_SECRET:default-secret-for-dev}
+    jwt.expiration=${JWT_EXPIRATION:86400000}
+    ```
+  </Tab>
+  
+  <Tab title="Docker Compose">
+    ```yaml
+    environment:
+      - JWT_SECRET=your-generated-secret-key-here
+      - JWT_EXPIRATION=86400000
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+Using environment variables is the recommended approach for production deployments to avoid committing secrets to version control.
+</Note>
+
+## Token Expiration Settings
+
+The `jwt.expiration` property defines token lifetime in milliseconds.
+
+### Common Expiration Times
+
+| Duration | Milliseconds | Configuration |
+|----------|--------------|---------------|
+| 15 minutes | 900000 | `jwt.expiration=900000` |
+| 1 hour | 3600000 | `jwt.expiration=3600000` |
+| 24 hours | 86400000 | `jwt.expiration=86400000` |
+| 7 days | 604800000 | `jwt.expiration=604800000` |
+| 30 days | 2592000000 | `jwt.expiration=2592000000` |
+
+### Recommendations
+
+- **Short-lived tokens** (15-60 min): High security applications
+- **Medium-lived tokens** (1-24 hours): Standard applications
+- **Long-lived tokens** (7-30 days): Mobile applications with refresh token strategy
+
+## JWT Utility Class
+
+The `JwtUtil` class handles token generation and validation:
+
+```java JwtUtil.java
+@Component
+public class JwtUtil {
+    @Value("${jwt.secret}")
+    private String SECRET;
+
+    @Value("${jwt.expiration}")
+    private long EXPIRATION_DATE;
+
+    public String generateToken(String username, String role) {
+        return JWT.create()
+                .withSubject(username)
+                .withClaim("role", role)
+                .withExpiresAt(new Date(System.currentTimeMillis() + EXPIRATION_DATE))
+                .sign(Algorithm.HMAC256(SECRET));
+    }
+
+    public DecodedJWT validateToken(String token) {
+        try {
+            return JWT.require(Algorithm.HMAC256(SECRET))
+                    .build()
+                    .verify(token);
+        } catch (JWTVerificationException exception) {
+            return null;
+        }
+    }
+}
+```
+
+**Key Features:**
+- Uses HMAC256 algorithm for signing
+- Stores username in the `subject` claim
+- Stores user role in a custom `role` claim
+- Validates token signature and expiration
+
+## Security Filter Chain
+
+The security configuration is defined in `SecurityConfig.java`:
+
+```java SecurityConfig.java
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+    @Autowired
+    JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(authz -> authz
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/users/me").hasAnyAuthority("ROLE_USER")
+                        .requestMatchers("/admin/users").hasAnyAuthority("ROLE_ADMIN")
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    PasswordEncoder passwordEncoder() { 
+        return new BCryptPasswordEncoder(); 
+    }
+}
+```
+
+### Security Features
+
+<AccordionGroup>
+  <Accordion title="CSRF Protection">
+    CSRF is disabled because JWT authentication is stateless and doesn't use cookies.
+    
+    ```java
+    .csrf(AbstractHttpConfigurer::disable)
+    ```
+  </Accordion>
+  
+  <Accordion title="Stateless Sessions">
+    Sessions are disabled for true stateless authentication.
+    
+    ```java
+    .sessionManagement(session -> 
+        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Password Encoding">
+    BCrypt is used for secure password hashing with a default strength of 10.
+    
+    ```java
+    @Bean
+    PasswordEncoder passwordEncoder() { 
+        return new BCryptPasswordEncoder(); 
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Authorization Rules
+
+Access control is configured per endpoint:
+
+| Endpoint Pattern | Required Authority | Description |
+|------------------|-------------------|-------------|
+| `/auth/**` | None (permitAll) | Authentication endpoints |
+| `/users/me` | `ROLE_USER` | User profile access |
+| `/admin/users` | `ROLE_ADMIN` | Admin user management |
+
+### Adding Custom Rules
+
+Add new authorization rules in the `SecurityFilterChain`:
+
+```java
+.authorizeHttpRequests(authz -> authz
+    .requestMatchers("/auth/**").permitAll()
+    .requestMatchers("/users/me").hasAnyAuthority("ROLE_USER")
+    .requestMatchers("/admin/**").hasAnyAuthority("ROLE_ADMIN")
+    .requestMatchers("/api/public/**").permitAll()
+    .anyRequest().authenticated()
+)
+```
+
+## JWT Authentication Filter
+
+The `JwtAuthenticationFilter` extracts and validates JWT tokens from requests:
+
+```java JwtAuthenticationFilter.java
+@Component
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+    @Autowired
+    JwtUtil jwtUtil;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, 
+                                   HttpServletResponse response, 
+                                   FilterChain filterChain) 
+            throws ServletException, IOException {
+        String authHeader = request.getHeader("Authorization");
+        String token = null;
+
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        }
+
+        if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            String username = jwtUtil.getUsernameFromToken(token);
+            String role = jwtUtil.getRoleFromToken(token);
+
+            UsernamePasswordAuthenticationToken authToken = 
+                new UsernamePasswordAuthenticationToken(
+                    username,
+                    null,
+                    Collections.singletonList(new SimpleGrantedAuthority(role))
+                );
+
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+        }
+        filterChain.doFilter(request, response);
+    }
+}
+```
+
+### Filter Flow
+
+1. **Extract token** from `Authorization` header
+2. **Validate token** using `JwtUtil`
+3. **Extract claims** (username and role)
+4. **Create authentication** object
+5. **Set security context** for the request
+6. **Continue filter chain**
+
+## Using JWT Tokens
+
+### Authentication Request
+
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin-user",
+    "password": "admin123"
+  }'
+```
+
+### Response
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+### Authenticated Request
+
+```bash
+curl -X GET http://localhost:8080/users/me \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Strong Secrets" icon="key">
+    Use randomly generated secrets of at least 256 bits. Never use default or predictable secrets in production.
+  </Card>
+  
+  <Card title="Short Expiration" icon="clock">
+    Set appropriate token expiration times. Implement refresh tokens for longer sessions.
+  </Card>
+  
+  <Card title="HTTPS Only" icon="lock">
+    Always use HTTPS in production to prevent token interception.
+  </Card>
+  
+  <Card title="Secret Rotation" icon="rotate">
+    Implement a strategy for rotating JWT secrets periodically.
+  </Card>
+</CardGroup>
+
+## Environment-Specific Security
+
+<Tabs>
+  <Tab title="Development">
+    ```properties
+    # Relaxed settings for development
+    jwt.secret=dev_secret_change_in_production
+    jwt.expiration=86400000
+    spring.console.enabled=true
+    ```
+  </Tab>
+  
+  <Tab title="Production">
+    ```bash
+    # Use environment variables
+    export JWT_SECRET=$(openssl rand -base64 32)
+    export JWT_EXPIRATION=3600000
+    
+    # Disable H2 console
+    # Remove spring.console.enabled from prod properties
+    ```
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+### Token Validation Fails
+
+**Check:**
+- Secret matches between token generation and validation
+- Token hasn't expired
+- Token format is correct (Bearer prefix)
+- Token hasn't been tampered with
+
+### Unauthorized Access
+
+**Verify:**
+- Token is included in `Authorization` header
+- Token has required role/authority
+- Endpoint requires authentication
+- Filter chain is properly configured
+
+### Invalid Signature
+
+**Causes:**
+- JWT secret changed after token generation
+- Token modified after signing
+- Wrong algorithm used for verification

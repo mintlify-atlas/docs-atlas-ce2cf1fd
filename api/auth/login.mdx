@@ -1,0 +1,97 @@
+---
+title: "Login"
+api: "POST /auth/login"
+description: "Authenticate a user and receive a JWT token"
+---
+
+## Request Body
+
+<ParamField body="email" type="string" required>
+  Email address of the user account
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Password for the user account
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="long">
+  Unique identifier of the authenticated user
+</ResponseField>
+
+<ResponseField name="token" type="string">
+  JWT authentication token to be used for subsequent authenticated requests
+</ResponseField>
+
+<ResponseField name="username" type="string">
+  Username of the authenticated user
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  Email address of the authenticated user
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.example.com/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "adminsystem@ums.com",
+    "password": "AdminPass123"
+  }'
+```
+
+```bash cURL (Normal User)
+curl -X POST https://api.example.com/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "usernormalsystem@ums.com",
+    "password": "UserPass123"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response (200 OK)
+{
+  "id": 1,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbi11c2VyIiwicm9sZSI6IlJPTEVfQURNSU4iLCJpYXQiOjE3MDk0NzIwMDAsImV4cCI6MTcwOTQ3NTYwMH0.abc123def456",
+  "username": "admin-user",
+  "email": "adminsystem@ums.com"
+}
+```
+
+</ResponseExample>
+
+## Error Responses
+
+### Authentication Failed (400 Bad Request)
+
+Returned when the email or password is incorrect:
+
+```json
+{
+  "timestamp": "2026-03-03T10:30:00.000+00:00",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Email o Contraseña incorrecto",
+  "path": "/auth/login"
+}
+```
+
+This error occurs when:
+- The email address is not found in the system
+- The password does not match the stored password for the given email
+
+## Using the JWT Token
+
+After successful authentication, include the returned JWT token in the `Authorization` header for subsequent requests:
+
+```bash
+curl -X GET https://api.example.com/api/protected-endpoint \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```

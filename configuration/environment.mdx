@@ -1,0 +1,156 @@
+---
+title: Environment Configuration
+description: Configure application profiles and environment-specific properties
+---
+
+## Overview
+
+The User Management System uses Spring Boot profiles to manage environment-specific configurations. You can switch between development and production environments by setting the active profile.
+
+## Profile Selection
+
+The active profile is configured in `application.properties`:
+
+```properties application.properties
+spring.application.name=userManagementSystem
+spring.profiles.active=dev
+```
+
+### Available Profiles
+
+<Tabs>
+  <Tab title="Development">
+    The development profile (`dev`) uses an in-memory H2 database and includes debugging features.
+    
+    ```bash
+    spring.profiles.active=dev
+    ```
+    
+    **Features:**
+    - H2 in-memory database
+    - SQL logging enabled
+    - H2 console accessible at `/h2-console`
+    - Auto-initialization with sample data
+    - Development JWT secret
+  </Tab>
+  
+  <Tab title="Production">
+    The production profile (`prod`) uses MySQL database with production-grade settings.
+    
+    ```bash
+    spring.profiles.active=prod
+    ```
+    
+    **Features:**
+    - MySQL database
+    - Schema update mode (not create-drop)
+    - Production JWT secret
+    - No sample data initialization
+  </Tab>
+</Tabs>
+
+## Switching Profiles
+
+### Method 1: Application Properties
+
+Edit `src/main/resources/application.properties`:
+
+```properties
+spring.profiles.active=prod
+```
+
+### Method 2: Environment Variable
+
+Set the `SPRING_PROFILES_ACTIVE` environment variable:
+
+<CodeGroup>
+```bash Linux/macOS
+export SPRING_PROFILES_ACTIVE=prod
+java -jar userManagementSystem.jar
+```
+
+```bash Windows
+set SPRING_PROFILES_ACTIVE=prod
+java -jar userManagementSystem.jar
+```
+</CodeGroup>
+
+### Method 3: Command Line Argument
+
+Pass the profile as a command line argument:
+
+```bash
+java -jar userManagementSystem.jar --spring.profiles.active=prod
+```
+
+### Method 4: Maven/Gradle
+
+Run with Maven:
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+## Environment Variables
+
+<Note>
+Environment variables override properties file values and are recommended for sensitive configuration like database passwords and JWT secrets.
+</Note>
+
+### Common Environment Variables
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `SPRING_PROFILES_ACTIVE` | Active profile | `prod` |
+| `SPRING_DATASOURCE_URL` | Database connection URL | `jdbc:mysql://localhost:3306/user_management` |
+| `SPRING_DATASOURCE_USERNAME` | Database username | `dbuser` |
+| `SPRING_DATASOURCE_PASSWORD` | Database password | `securepassword` |
+| `JWT_SECRET` | JWT signing secret | `your-256-bit-secret` |
+| `JWT_EXPIRATION` | Token expiration in ms | `86400000` (24 hours) |
+
+## Application Properties
+
+### Base Configuration
+
+These properties are shared across all profiles:
+
+```properties
+spring.application.name=userManagementSystem
+server.error.include-message=always
+```
+
+<Warning>
+The `server.error.include-message=always` setting includes error messages in responses. Consider restricting this in production for security.
+</Warning>
+
+## Profile-Specific Files
+
+Create profile-specific configuration files:
+
+- `application-dev.properties` - Development configuration
+- `application-prod.properties` - Production configuration
+- `application-{custom}.properties` - Custom profile configuration
+
+Spring Boot automatically loads the active profile's configuration file and merges it with the base `application.properties`.
+
+## Best Practices
+
+1. **Never commit secrets** - Use environment variables for sensitive data
+2. **Use dev profile locally** - Keep the in-memory database for development
+3. **Externalize production config** - Store production properties outside the JAR
+4. **Validate on startup** - Ensure required properties are set before the application starts
+5. **Document custom properties** - Maintain clear documentation for any custom configuration
+
+## Example: Production Deployment
+
+```bash
+# Set environment variables
+export SPRING_PROFILES_ACTIVE=prod
+export SPRING_DATASOURCE_URL=jdbc:mysql://prod-db.example.com:3306/user_management
+export SPRING_DATASOURCE_USERNAME=prod_user
+export SPRING_DATASOURCE_PASSWORD=secure_password_here
+export JWT_SECRET=production-secret-key-256-bits-minimum
+
+# Run the application
+java -jar userManagementSystem.jar
+```

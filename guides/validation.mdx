@@ -1,0 +1,370 @@
+---
+title: Input Validation
+description: Learn about request validation rules and constraints in the User Management System
+---
+
+## Overview
+
+The User Management System uses Jakarta Validation (formerly Bean Validation) to ensure data integrity. Validation annotations are applied to DTO fields and automatically enforced by Spring Boot.
+
+## Validation Dependencies
+
+Validation is enabled via the Spring Boot Starter Validation dependency:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-validation</artifactId>
+</dependency>
+```
+
+This includes:
+- Jakarta Validation API
+- Hibernate Validator (reference implementation)
+- Spring integration for automatic validation
+
+## CreateUserDTO Validation Rules
+
+The `CreateUserDTO` is used for user registration and has comprehensive validation.
+
+**Location**: `src/main/java/dev/juanJe/userManagementSystem/dto/CreateUserDTO.java`
+
+### Field Constraints
+
+<Accordion title="Username Validation">
+  ```java
+  @NotBlank(message = "Username obligatorio")
+  @Size(min = 3, max = 20, message = "El username debe tener entre 3 y 20 caracteres")
+  private String username;
+  ```
+  
+  **Rules**:
+  - Cannot be null, empty, or only whitespace
+  - Minimum length: 3 characters
+  - Maximum length: 20 characters
+  
+  **Valid examples**:
+  ```json
+  "username": "john_doe"     // ✓ Valid
+  "username": "alice"        // ✓ Valid  
+  "username": "user123"      // ✓ Valid
+  ```
+  
+  **Invalid examples**:
+  ```json
+  "username": "jo"           // ✗ Too short (< 3 chars)
+  "username": ""             // ✗ Empty string
+  "username": "averylongusernamethatexceeds"  // ✗ Too long (> 20 chars)
+  ```
+</Accordion>
+
+<Accordion title="Email Validation">
+  ```java
+  @NotBlank(message = "Email obligatorio")
+  @Email(message = "El email debe ser valido")
+  private String email;
+  ```
+  
+  **Rules**:
+  - Cannot be null, empty, or only whitespace
+  - Must match standard email format (RFC 5322)
+  
+  **Valid examples**:
+  ```json
+  "email": "user@example.com"           // ✓ Valid
+  "email": "john.doe@company.co.uk"     // ✓ Valid
+  "email": "test+tag@domain.org"        // ✓ Valid
+  ```
+  
+  **Invalid examples**:
+  ```json
+  "email": "invalid-email"              // ✗ Missing @ and domain
+  "email": "@example.com"               // ✗ Missing local part
+  "email": "user@"                      // ✗ Missing domain
+  "email": "user name@example.com"      // ✗ Contains space
+  ```
+</Accordion>
+
+<Accordion title="Password Validation">
+  ```java
+  @NotBlank(message = "Password obligatorio")
+  @Size(min = 8, max = 16, message = "La password debe tener entre 8 y 16 caracteres")
+  @Pattern(
+      regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).*$",
+      message = "La password debe tener al menos una numero, una letra minuscula y una letra mayuscula"
+  )
+  private String password;
+  ```
+  
+  **Rules**:
+  - Cannot be null, empty, or only whitespace
+  - Minimum length: 8 characters
+  - Maximum length: 16 characters
+  - Must contain at least one lowercase letter (`a-z`)
+  - Must contain at least one uppercase letter (`A-Z`)
+  - Must contain at least one digit (`0-9`)
+  
+  **Valid examples**:
+  ```json
+  "password": "SecurePass1"      // ✓ Valid (has upper, lower, digit)
+  "password": "MyP@ssw0rd"       // ✓ Valid (has upper, lower, digit)
+  "password": "Test1234"         // ✓ Valid (has upper, lower, digit)
+  ```
+  
+  **Invalid examples**:
+  ```json
+  "password": "short1A"          // ✗ Too short (< 8 chars)
+  "password": "alllowercase123"  // ✗ No uppercase letter
+  "password": "ALLUPPERCASE123"  // ✗ No lowercase letter
+  "password": "NoDigitsHere"     // ✗ No numeric digit
+  "password": "VeryLongPasswordThatExceeds16Chars1" // ✗ Too long (> 16 chars)
+  ```
+  
+  **Regex breakdown**:
+  - `^` - Start of string
+  - `(?=.*[a-z])` - Positive lookahead for at least one lowercase letter
+  - `(?=.*[A-Z])` - Positive lookahead for at least one uppercase letter
+  - `(?=.*\d)` - Positive lookahead for at least one digit
+  - `.*` - Match any characters
+  - `$` - End of string
+</Accordion>
+
+### Complete Example
+
+<CodeGroup>
+```json Valid Request
+{
+  "username": "john_doe",
+  "email": "john.doe@example.com",
+  "password": "SecurePass123"
+}
+```
+
+```json Invalid Request (Multiple Errors)
+{
+  "username": "jo",
+  "email": "invalid-email",
+  "password": "weak"
+}
+
+// Response:
+{
+  "message": "Error de validacion",
+  "status": 400,
+  "timestamp": "2026-03-03T10:30:45.123",
+  "errors": [
+    "El username debe tener entre 3 y 20 caracteres",
+    "El email debe ser valido",
+    "La password debe tener entre 8 y 16 caracteres",
+    "La password debe tener al menos una numero, una letra minuscula y una letra mayuscula"
+  ]
+}
+```
+</CodeGroup>
+
+## LoginUserDTO Validation
+
+The `LoginUserDTO` is used for authentication and has minimal validation.
+
+**Location**: `src/main/java/dev/juanJe/userManagementSystem/dto/LoginUserDTO.java`
+
+```java
+public class LoginUserDTO {
+    private String email;
+    private String password;
+}
+```
+
+<Note>
+  Currently, `LoginUserDTO` does not have validation annotations. Authentication logic handles missing or invalid credentials through service-layer checks and returns appropriate `ResponseStatusException` errors.
+</Note>
+
+### Example Usage
+
+```json
+{
+  "email": "john.doe@example.com",
+  "password": "SecurePass123"
+}
+```
+
+## How Validation Works
+
+<Steps>
+  <Step title="Request received">
+    Client sends JSON request to an endpoint like `/api/signup`
+  </Step>
+  
+  <Step title="Deserialization">
+    Spring converts JSON to DTO object (e.g., `CreateUserDTO`)
+  </Step>
+  
+  <Step title="Validation triggered">
+    When controller method has `@Valid` or `@Validated` annotation, Jakarta Validation runs:
+    
+    ```java
+    @PostMapping("/signup")
+    public ResponseEntity<SignupResponseDTO> signup(
+        @Valid @RequestBody CreateUserDTO createUserDTO
+    ) {
+        // ...
+    }
+    ```
+  </Step>
+  
+  <Step title="Error handling">
+    If validation fails, `MethodArgumentNotValidException` is thrown and caught by `GlobalExceptionHandler`
+  </Step>
+  
+  <Step title="Response returned">
+    Client receives `ErrorResponseDTO` with all validation errors
+  </Step>
+</Steps>
+
+## Common Validation Annotations
+
+### Jakarta Validation Standard Annotations
+
+| Annotation | Description | Example |
+|------------|-------------|----------|
+| `@NotNull` | Field cannot be null | `@NotNull String name` |
+| `@NotBlank` | String cannot be null, empty, or whitespace | `@NotBlank String username` |
+| `@NotEmpty` | Collection/String cannot be null or empty | `@NotEmpty List<String> items` |
+| `@Size` | Validates length/size within range | `@Size(min=3, max=20)` |
+| `@Email` | Validates email format | `@Email String email` |
+| `@Pattern` | Matches regex pattern | `@Pattern(regexp="^[A-Z].*")` |
+| `@Min` / `@Max` | Number range validation | `@Min(18) int age` |
+| `@Past` / `@Future` | Date/time validation | `@Past LocalDate birthDate` |
+
+### Custom Messages
+
+All validation annotations support custom error messages:
+
+```java
+@NotBlank(message = "Username is required")
+@Size(min = 3, max = 20, message = "Username must be between 3 and 20 characters")
+private String username;
+```
+
+## Validation Error Response Format
+
+When validation fails, the response follows this structure:
+
+```json
+{
+  "message": "Error de validacion",
+  "status": 400,
+  "timestamp": "2026-03-03T10:30:45.123456",
+  "errors": [
+    "Username obligatorio",
+    "El email debe ser valido"
+  ]
+}
+```
+
+**Fields**:
+- `message`: High-level error description
+- `status`: HTTP status code (always `400` for validation errors)
+- `timestamp`: When the error occurred (automatically populated)
+- `errors`: Array of specific validation error messages
+
+## Testing Validation Rules
+
+You can test validation programmatically:
+
+```java
+@Test
+void testValidation() {
+    ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+    Validator validator = factory.getValidator();
+    
+    CreateUserDTO dto = new CreateUserDTO();
+    dto.setUsername("jo");  // Too short
+    dto.setEmail("invalid");  // Invalid format
+    dto.setPassword("weak");  // Doesn't meet requirements
+    
+    Set<ConstraintViolation<CreateUserDTO>> violations = validator.validate(dto);
+    
+    assertEquals(4, violations.size());  // Should have 4 validation errors
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Validate at the boundary">
+    Apply validation to DTOs (data transfer objects) at the API boundary, not domain models.
+  </Step>
+  
+  <Step title="Provide clear error messages">
+    Use descriptive, user-friendly validation messages:
+    
+    ```java
+    // Good
+    @NotBlank(message = "Username is required")
+    
+    // Bad
+    @NotBlank  // Uses default message
+    ```
+  </Step>
+  
+  <Step title="Combine multiple constraints">
+    Use multiple annotations for comprehensive validation:
+    
+    ```java
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email must be valid")
+    @Size(max = 100, message = "Email must not exceed 100 characters")
+    private String email;
+    ```
+  </Step>
+  
+  <Step title="Use @Valid in controllers">
+    Always add `@Valid` to request body parameters:
+    
+    ```java
+    public ResponseEntity<?> createUser(@Valid @RequestBody CreateUserDTO dto) {
+        // Validation happens automatically before this method executes
+    }
+    ```
+  </Step>
+</Steps>
+
+## Custom Validators
+
+For complex validation logic, create custom validators:
+
+```java
+@Target({ElementType.FIELD})
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy = UniqueEmailValidator.class)
+public @interface UniqueEmail {
+    String message() default "Email already exists";
+    Class<?>[] groups() default {};
+    Class<? extends Payload>[] payload() default {};
+}
+
+public class UniqueEmailValidator implements ConstraintValidator<UniqueEmail, String> {
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Override
+    public boolean isValid(String email, ConstraintValidatorContext context) {
+        return email != null && !userRepository.existsByEmail(email);
+    }
+}
+```
+
+Usage:
+
+```java
+@NotBlank(message = "Email obligatorio")
+@Email(message = "El email debe ser valido")
+@UniqueEmail(message = "El email ya esta registrado")
+private String email;
+```
+
+<Note>
+  Custom validators can inject Spring beans and access the database for complex validation logic.
+</Note>

@@ -1,0 +1,111 @@
+---
+title: Introduction
+description: A modern, secure REST API for user management built with Spring Boot 3, Spring Security, and JWT authentication
+---
+
+# User Management System API
+
+A production-ready REST API for user management built with Java 17 and Spring Boot 3. This system provides secure authentication, role-based access control, and comprehensive user administration capabilities.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running in minutes with our step-by-step guide
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/auth/signup">
+    Explore all available endpoints and their schemas
+  </Card>
+  <Card title="Authentication" icon="lock" href="/concepts/authentication">
+    Learn how JWT authentication works in this system
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/environment">
+    Configure database, security, and environment settings
+  </Card>
+</CardGroup>
+
+## Key Features
+
+This API is designed with modern best practices and enterprise-grade security:
+
+- **Clean REST Architecture** - Modular design with clear separation of concerns across controllers, services, repositories, and DTOs
+- **JWT Authentication** - Stateless authentication using JSON Web Tokens with Auth0 library
+- **Role-Based Access Control** - Two-tier authorization with `ROLE_USER` and `ROLE_ADMIN` roles
+- **Input Validation** - Comprehensive field validation using Jakarta Validation annotations
+- **Dual Database Support** - H2 in-memory database for development, MySQL for production
+- **Security First** - BCrypt password encryption, CSRF protection, and stateless session management
+- **Code Quality** - Lombok for reduced boilerplate, JUnit/Mockito tests, and JaCoCo coverage reporting
+
+## Technology Stack
+
+Built with industry-standard technologies:
+
+| Component | Version | Purpose |
+|-----------|---------|----------|
+| **Java** | 17 | Core language with modern features |
+| **Spring Boot** | 3.5.4 | Application framework |
+| **Spring Security** | 6.x | Authentication & authorization |
+| **Spring Data JPA** | - | ORM and database persistence |
+| **Auth0 JWT** | 3.18.1 | JWT token generation and validation |
+| **H2 Database** | - | In-memory database for development |
+| **MySQL** | - | Production database |
+| **Lombok** | - | Reduces boilerplate code |
+| **Maven** | - | Dependency management and build |
+| **JUnit & Mockito** | - | Unit and integration testing |
+| **JaCoCo** | 0.8.10 | Code coverage analysis |
+
+## Architecture Overview
+
+The system follows a layered architecture pattern:
+
+```
+userManagementSystem/
+├── config/          → Security, global exception handling
+├── controllers/     → AuthController, UserController
+├── dto/             → Request/response data transfer objects
+├── models/          → User, Role entities
+├── repositories/    → Spring Data JPA repositories
+├── security/        → JWT filter, JWT utilities
+└── services/        → Business logic layer
+```
+
+<Info>
+  The API uses Spring profiles to manage different environments: `dev` for development with H2, and `prod` for production with MySQL.
+</Info>
+
+## Authentication Flow
+
+The system implements a stateless JWT-based authentication:
+
+1. **Signup**: User registers via `/auth/signup` with username, email, and password
+2. **Login**: User authenticates via `/auth/login` and receives a JWT token
+3. **Authorization**: Client includes JWT token in subsequent requests via `Authorization` header
+4. **Access Control**: Spring Security validates the token and checks role permissions
+
+<Note>
+  All passwords are hashed using BCrypt before storage. The system never stores plain-text passwords.
+</Note>
+
+## API Endpoints
+
+The API provides four main endpoints:
+
+| Method | Endpoint | Description | Role Required |
+|--------|----------|-------------|---------------|
+| `POST` | `/auth/signup` | Register a new user account | Public |
+| `POST` | `/auth/login` | Authenticate and receive JWT token | Public |
+| `GET` | `/users/me` | Get current user information | `ROLE_USER` |
+| `GET` | `/admin/users` | List all registered users | `ROLE_ADMIN` |
+
+<Warning>
+  The `/admin/users` endpoint is restricted to users with `ROLE_ADMIN` and will return 403 Forbidden for regular users.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start Guide" icon="play" href="/quickstart">
+    Follow our quickstart to make your first API call
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/auth/signup">
+    Browse detailed endpoint documentation
+  </Card>
+</CardGroup>

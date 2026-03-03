@@ -1,0 +1,122 @@
+---
+title: "Sign Up"
+api: "POST /auth/signup"
+description: "Register a new user account"
+---
+
+## Request Body
+
+<ParamField body="username" type="string" required>
+  Username for the new account
+  
+  **Validation rules:**
+  - Required field
+  - Must be between 3 and 20 characters
+  - Cannot be blank
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address for the new account
+  
+  **Validation rules:**
+  - Required field
+  - Must be a valid email format
+  - Cannot be blank
+  - Must be unique (not already registered)
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Password for the new account
+  
+  **Validation rules:**
+  - Required field
+  - Must be between 8 and 16 characters
+  - Must contain at least one uppercase letter (A-Z)
+  - Must contain at least one lowercase letter (a-z)
+  - Must contain at least one digit (0-9)
+  - Cannot be blank
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="long">
+  Unique identifier for the newly created user
+</ResponseField>
+
+<ResponseField name="username" type="string">
+  Username of the newly created user
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  Email address of the newly created user
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl -X POST https://api.example.com/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "johndoe",
+    "email": "john.doe@example.com",
+    "password": "SecurePass123"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json Success Response (201 Created)
+{
+  "id": 3,
+  "username": "johndoe",
+  "email": "john.doe@example.com"
+}
+```
+
+</ResponseExample>
+
+## Error Responses
+
+### Validation Errors (400 Bad Request)
+
+Returned when the request body fails validation:
+
+```json
+{
+  "message": "Error de validacion",
+  "statusCode": 400,
+  "errors": [
+    "El username debe tener entre 3 y 20 caracteres",
+    "El email debe ser valido",
+    "La password debe tener al menos una numero, una letra minuscula y una letra mayuscula"
+  ]
+}
+```
+
+**Common validation errors:**
+- `"Username obligatorio"` - Username field is missing or blank
+- `"El username debe tener entre 3 y 20 caracteres"` - Username length is invalid
+- `"Email obligatorio"` - Email field is missing or blank
+- `"El email debe ser valido"` - Email format is invalid
+- `"Password obligatorio"` - Password field is missing or blank
+- `"La password debe tener entre 8 y 16 caracteres"` - Password length is invalid
+- `"La password debe tener al menos una numero, una letra minuscula y una letra mayuscula"` - Password doesn't meet complexity requirements
+
+### Duplicate User (400 Bad Request)
+
+Returned when the username or email is already registered:
+
+```json
+{
+  "timestamp": "2026-03-03T10:30:00.000+00:00",
+  "status": 400,
+  "error": "Bad Request",
+  "path": "/auth/signup"
+}
+```
+
+This error occurs when:
+- A user with the same username already exists
+- A user with the same email already exists

@@ -1,0 +1,283 @@
+---
+title: Testing Guide
+description: Learn how to run and write tests for the User Management System
+---
+
+## Overview
+
+The User Management System uses JUnit 5, Mockito, and Spring Boot Test for comprehensive testing coverage. Tests are organized into unit and integration tests, with JaCoCo providing code coverage reports.
+
+## Running Tests
+
+<Steps>
+  <Step title="Run all tests">
+    Execute the complete test suite using Maven:
+    
+    ```bash
+    mvn test
+    ```
+    
+    This command runs all unit and integration tests and generates a JaCoCo coverage report.
+  </Step>
+  
+  <Step title="Run specific test class">
+    To run a specific test class:
+    
+    ```bash
+    mvn test -Dtest=UserServiceImplTest
+    ```
+  </Step>
+  
+  <Step title="View coverage report">
+    After running tests, open the JaCoCo HTML report:
+    
+    ```bash
+    open target/site/jacoco/index.html
+    ```
+    
+    The report is located at `target/site/jacoco/index.html`
+  </Step>
+</Steps>
+
+## Test Structure
+
+### Unit Tests
+
+Unit tests verify individual components in isolation using mocks. Located in `src/test/java/.../unit/`
+
+<Accordion title="UserServiceImplTest - Service Layer Tests">
+  Tests the core user service business logic with mocked dependencies.
+  
+  **Location**: `src/test/java/dev/juanJe/userManagementSystem/unit/service/UserServiceImplTest.java`
+  
+  **Key test cases**:
+  - User registration with valid data
+  - Duplicate user detection (username/email)
+  - User authentication with valid credentials
+  - Authentication failure with invalid credentials
+  - User info retrieval
+  - Password verification
+  - List all users
+  
+  ```java
+  @Test
+  @DisplayName("registerUser() Should register a user successfully")
+  void shouldRegisterUserSuccessfully() {
+      CreateUserDTO dto = new CreateUserDTO();
+      dto.setUsername("Juan");
+      dto.setEmail("juan@gmail.com");
+      dto.setPassword("1234");
+      
+      when(userRepository.existsByEmail("juan@gmail.com")).thenReturn(false);
+      when(userRepository.existsByUsername("Juan")).thenReturn(false);
+      
+      SignupResponseDTO response = userServiceImpl.registerUser(dto);
+      
+      assertEquals("Juan", response.getUsername());
+      assertNotNull(response.getId());
+  }
+  ```
+</Accordion>
+
+<Accordion title="JwtUtilTest - JWT Token Tests">
+  Tests JWT token generation and validation.
+  
+  **Location**: `src/test/java/dev/juanJe/userManagementSystem/unit/security/JwtUtilTest.java`
+  
+  **Key test cases**:
+  - Token generation with username and role
+  - Token validation and claims extraction
+  - Invalid token handling
+  
+  ```java
+  @Test
+  @DisplayName("Should generate and validate token successfully")
+  void shouldGenerateAndValidateTokenSuccessfully() {
+      String token = jwtUtil.generateToken("Juan", "ROLE_USER");
+      
+      assertNotNull(token);
+      assertEquals("Juan", jwtUtil.getUsernameFromToken(token));
+      assertEquals("ROLE_USER", jwtUtil.getRoleFromToken(token));
+  }
+  ```
+</Accordion>
+
+<Accordion title="ErrorResponseDTOTest - DTO Tests">
+  Tests the error response data structure.
+  
+  **Location**: `src/test/java/dev/juanJe/userManagementSystem/unit/dto/ErrorResponseDTOTest.java`
+  
+  **Key test cases**:
+  - Constructor initialization
+  - Automatic timestamp generation
+  - Error list handling
+</Accordion>
+
+### Integration Tests
+
+Integration tests verify component interactions. Located in `src/test/java/.../integration/`
+
+<Accordion title="JwtAuthenticationFilterTest - Security Filter Tests">
+  Tests the JWT authentication filter in the security chain.
+  
+  **Location**: `src/test/java/dev/juanJe/userManagementSystem/integration/security/JwtAuthenticationFilterTest.java`
+  
+  **Key test cases**:
+  - Authentication with valid JWT token
+  - Request handling without token
+  - Security context population
+  
+  ```java
+  @Test
+  @DisplayName("Should authenticate when valid token present")
+  void shouldAuthenticateWhenValidTokenPresent() throws Exception {
+      String token = "valid.jwt.token";
+      
+      when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+      when(jwtUtil.getUsernameFromToken(token)).thenReturn("Juan");
+      when(jwtUtil.getRoleFromToken(token)).thenReturn("ROLE_USER");
+      
+      jwtAuthenticationFilter.doFilter(request, response, filterChain);
+      
+      assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+      assertEquals("Juan", SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+  }
+  ```
+</Accordion>
+
+## JaCoCo Coverage Reports
+
+JaCoCo is configured in the Maven build to automatically generate coverage reports.
+
+### Configuration
+
+The JaCoCo plugin is configured in `pom.xml:108-125`:
+
+```xml
+<plugin>
+    <groupId>org.jacoco</groupId>
+    <artifactId>jacoco-maven-plugin</artifactId>
+    <version>0.8.10</version>
+    <executions>
+        <execution>
+            <goals>
+                <goal>prepare-agent</goal>
+            </goals>
+        </execution>
+        <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+                <goal>report</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+```
+
+### Reading Coverage Reports
+
+The HTML report shows:
+- **Line coverage**: Percentage of code lines executed
+- **Branch coverage**: Percentage of conditional branches tested
+- **Method coverage**: Percentage of methods invoked
+- **Class coverage**: Percentage of classes tested
+
+<Note>
+  Coverage reports are generated automatically during `mvn test` and are located in `target/site/jacoco/`
+</Note>
+
+## Test Dependencies
+
+Key testing dependencies from `pom.xml`:
+
+<CodeGroup>
+```xml Spring Boot Test
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-test</artifactId>
+    <scope>test</scope>
+</dependency>
+```
+
+```xml Spring Security Test
+<dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-test</artifactId>
+    <scope>test</scope>
+</dependency>
+```
+
+```xml H2 Database (Test)
+<dependency>
+    <groupId>com.h2database</groupId>
+    <artifactId>h2</artifactId>
+    <scope>runtime</scope>
+</dependency>
+```
+</CodeGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use descriptive test names">
+    Use `@DisplayName` annotations to clearly describe what each test verifies:
+    
+    ```java
+    @DisplayName("registerUser() Should throw exception when user already exists")
+    ```
+  </Step>
+  
+  <Step title="Organize with test ordering">
+    Use `@TestMethodOrder` and `@Order` for logical test execution:
+    
+    ```java
+    @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+    public class UserServiceImplTest {
+        @Test
+        @Order(1)
+        void shouldRegisterUserSuccessfully() { ... }
+    }
+    ```
+  </Step>
+  
+  <Step title="Mock external dependencies">
+    Use `@Mock` and `@InjectMocks` for clean dependency injection:
+    
+    ```java
+    @Mock
+    private UserRepository userRepository;
+    
+    @InjectMocks
+    private UserServiceImpl userServiceImpl;
+    ```
+  </Step>
+  
+  <Step title="Verify interactions">
+    Always verify that mocked methods were called as expected:
+    
+    ```java
+    verify(userRepository).findByEmail("juan@gmail.com");
+    verify(passwordEncoder).matches("123456", "encodedPassword");
+    ```
+  </Step>
+</Steps>
+
+## Running Tests in CI/CD
+
+For continuous integration pipelines:
+
+```bash
+# Run tests with coverage
+mvn clean test
+
+# Package application (runs tests automatically)
+mvn clean package
+
+# Skip tests if needed (not recommended)
+mvn clean package -DskipTests
+```
+
+<Note>
+  The `mvn package` command automatically runs all tests before creating the JAR file.
+</Note>
